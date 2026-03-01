@@ -3,50 +3,61 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Minimal AI Image Generator</title>
+    <title>Minimal AI Image Generator - Gemini Edition</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         
+        :root {
+            --bg-navy: #0B1220;
+            --accent-blue: #2563eb;
+        }
+
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #0B1220;
+            background-color: var(--bg-navy);
             color: white;
             margin: 0;
             display: flex;
             flex-direction: column;
             min-height: 100vh;
+            overflow-x: hidden;
+            -webkit-tap-highlight-color: transparent;
         }
 
-        /* Input Container Fix: No corners sticking out */
-        .input-container {
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 22px; /* Perfect 22px radius */
+        /* Perfect Rounded Container Fix (No artifacts sticking out) */
+        .input-group {
             position: relative;
-            transition: all 0.3s ease;
-            overflow: hidden; /* Yeh corners ko nikalne se rokta hai */
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px; /* User Requested 22-24px Radius */
+            padding: 4px;
             display: flex;
             align-items: center;
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            overflow: hidden; /* This kills the corner artifact/sar issue */
+            width: 100%;
         }
 
-        .input-container:focus-within {
-            border-color: rgba(59, 130, 246, 0.4);
-            box-shadow: 0 0 25px rgba(59, 130, 246, 0.15);
-            background: rgba(255, 255, 255, 0.05);
+        .input-group:focus-within {
+            border-color: rgba(37, 99, 235, 0.5);
+            box-shadow: 0 0 30px rgba(37, 99, 235, 0.15);
+            background: rgba(255, 255, 255, 0.06);
         }
 
-        /* Ambient Glow */
-        .glow {
-            position: absolute;
-            width: 300px;
-            height: 300px;
-            background: rgba(59, 130, 246, 0.1);
-            filter: blur(100px);
-            border-radius: 50%;
-            pointer-events: none;
-            z-index: 0;
+        .custom-input {
+            background: transparent;
+            border: none;
+            outline: none;
+            color: white;
+            padding: 14px 18px;
+            font-size: 17px;
+            width: 100%;
+        }
+
+        .custom-input::placeholder {
+            color: #64748b;
         }
 
         .loader {
@@ -56,236 +67,283 @@
 
         @keyframes spin { 100% { transform: rotate(360deg); } }
 
-        .result-card {
-            background: rgba(255, 255, 255, 0.02);
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 28px;
-            animation: slideUp 0.5s ease-out;
+        .fade-in-up {
+            animation: fadeInUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
 
-        @keyframes slideUp {
+        @keyframes fadeInUp {
             from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
         }
+
+        .image-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(20px);
+            border-radius: 32px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
     </style>
 </head>
-<body class="p-6 flex items-center justify-center">
+<body class="items-center justify-center p-6 sm:p-12">
 
-    <div class="glow top-0 left-1/2 -translate-x-1/2"></div>
+    <!-- Ambient Glow Background -->
+    <div class="fixed top-0 left-1/2 -translate-x-1/2 w-full h-full pointer-events-none opacity-20 select-none">
+        <div class="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-blue-600 blur-[140px] rounded-full"></div>
+    </div>
 
     <main class="w-full max-w-lg relative z-10 flex flex-col items-center">
         
-        <!-- Headline -->
-        <header id="hero" class="text-center mb-14 transition-all duration-700">
-            <h1 class="text-4xl sm:text-5xl font-bold tracking-tight mb-4">
-                Create Without Limits
+        <!-- Headline Section -->
+        <header id="hero" class="text-center mb-14 space-y-4 transition-all duration-700">
+            <h1 class="text-4xl sm:text-5xl font-bold tracking-tight text-white leading-tight">
+                Create Without <br> Limits
             </h1>
             <p class="text-slate-400 text-lg font-medium opacity-80">
                 From idea to image — instantly.
             </p>
         </header>
 
-        <!-- Result Section -->
-        <div id="result-area" class="hidden w-full mb-10 result-card overflow-hidden relative min-h-[300px] flex items-center justify-center">
-            <!-- Loading -->
-            <div id="loading" class="hidden absolute inset-0 bg-[#0B1220]/80 z-20 flex flex-col items-center justify-center gap-4">
-                <div class="w-10 h-10 border-2 border-blue-500 loader rounded-full"></div>
-                <p class="text-slate-400 text-sm font-medium animate-pulse">Generating your vision...</p>
-            </div>
+        <!-- Result Display -->
+        <div id="result-view" class="hidden w-full mb-12 fade-in-up">
+            <div class="image-card relative aspect-square w-full overflow-hidden">
+                <!-- Loading State -->
+                <div id="loading-overlay" class="hidden absolute inset-0 bg-[#0B1220]/80 z-20 flex flex-col items-center justify-center space-y-4">
+                    <div class="w-11 h-11 border-2 border-blue-500 loader rounded-full"></div>
+                    <p class="text-slate-400 text-sm font-medium animate-pulse tracking-wide">Refining your vision...</p>
+                </div>
 
-            <!-- Image Output -->
-            <img id="output-image" src="" class="hidden w-full h-auto object-cover max-h-[500px]">
-            
-            <!-- Text Response (For Reasoning) -->
-            <div id="output-text" class="hidden p-8 text-slate-300 leading-relaxed text-lg"></div>
+                <!-- Generated Image -->
+                <img id="output-image" src="" class="hidden w-full h-full object-cover">
+                
+                <!-- Text Response (For Reasoning) -->
+                <div id="output-text" class="hidden p-10 text-slate-300 leading-relaxed text-lg overflow-y-auto h-full scrollbar-hide"></div>
 
-            <!-- Actions -->
-            <div id="actions" class="absolute bottom-4 right-4 flex gap-2 hidden">
-                <button onclick="resetUI()" class="p-3 bg-white/10 rounded-full hover:bg-white/20 transition-all"><i data-lucide="refresh-cw" class="w-5 h-5"></i></button>
-                <a id="download-link" href="#" download="ai-vision.png" class="p-3 bg-blue-600 rounded-full hover:bg-blue-500 transition-all"><i data-lucide="download" class="w-5 h-5"></i></a>
+                <!-- Hover Actions -->
+                <div id="action-buttons" class="absolute bottom-6 right-6 flex gap-3 hidden">
+                    <button onclick="resetUI()" class="p-4 bg-white/10 backdrop-blur-md rounded-full hover:bg-white/20 transition-all active:scale-90">
+                        <i data-lucide="refresh-cw" class="w-5 h-5"></i>
+                    </button>
+                    <a id="download-trigger" href="#" download="gemini-art.png" class="p-4 bg-blue-600 rounded-full hover:bg-blue-500 transition-all shadow-xl active:scale-90">
+                        <i data-lucide="download" class="w-5 h-5"></i>
+                    </a>
+                </div>
             </div>
         </div>
 
-        <!-- Reference Preview -->
-        <div id="ref-preview" class="hidden w-full mb-4 flex items-center gap-3 bg-white/5 p-2 rounded-2xl border border-white/10">
-            <img id="ref-thumb" src="" class="w-12 h-12 rounded-lg object-cover">
-            <div class="flex-1">
-                <p class="text-[10px] font-bold text-blue-400 uppercase tracking-widest">Reference Active</p>
-                <p class="text-xs text-slate-500">Image will guide the AI</p>
+        <!-- Reference Image Preview -->
+        <div id="ref-preview" class="hidden w-full mb-6 fade-in-up">
+            <div class="flex items-center gap-4 bg-white/5 border border-white/10 rounded-2xl p-2.5 pr-5">
+                <div class="relative h-14 w-14 rounded-xl overflow-hidden border border-white/20">
+                    <img id="ref-thumb" src="" class="h-full w-full object-cover">
+                    <button onclick="clearReference()" class="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 hover:opacity-100 transition-all">
+                        <i data-lucide="x" class="w-4 h-4"></i>
+                    </button>
+                </div>
+                <div class="flex-1">
+                    <p class="text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-0.5">Reference Active</p>
+                    <p class="text-xs text-slate-500">Image guides Gemini AI</p>
+                </div>
+                <button onclick="clearReference()" class="text-slate-600 hover:text-white transition-colors">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                </button>
             </div>
-            <button onclick="clearRef()" class="p-2 text-slate-500 hover:text-white"><i data-lucide="x" class="w-4 h-4"></i></button>
         </div>
 
-        <!-- Main Input Form -->
-        <form id="gen-form" class="w-full">
-            <div class="input-container p-1 pl-6">
+        <!-- Main Interaction Form (22px radius focus) -->
+        <form id="gen-form" class="w-full relative">
+            <div class="input-group">
                 <input 
                     type="text" 
-                    id="prompt-input"
+                    id="prompt-field"
                     placeholder="Describe your vision.."
-                    class="w-full bg-transparent py-4 text-white placeholder:text-slate-600 focus:outline-none text-lg"
+                    class="custom-input"
                     required
+                    autocomplete="off"
                 >
-                <div class="flex items-center gap-1 pr-2">
-                    <button type="button" onclick="document.getElementById('file-input').click()" class="p-3 text-slate-500 hover:text-blue-400 transition-colors">
+                <div class="flex items-center gap-1.5 pr-2">
+                    <!-- Image Picker Button -->
+                    <button type="button" onclick="document.getElementById('file-picker').click()" class="p-3 text-slate-500 hover:text-blue-400 transition-all" title="Add Reference">
                         <i data-lucide="image-plus" class="w-6 h-6"></i>
                     </button>
-                    <button type="submit" id="submit-btn" class="w-12 h-12 bg-white/5 text-slate-700 rounded-full flex items-center justify-center transition-all cursor-not-allowed">
+                    <!-- Submit Button (Blue Circle) -->
+                    <button type="submit" id="submit-btn" class="w-11 h-11 bg-white/5 text-slate-700 rounded-full flex items-center justify-center transition-all cursor-not-allowed">
                         <i data-lucide="arrow-up" class="w-6 h-6"></i>
                     </button>
                 </div>
             </div>
-            <input type="file" id="file-input" class="hidden" accept="image/*" onchange="handleFile(event)">
+            <!-- Invisible File Input -->
+            <input type="file" id="file-picker" class="hidden" accept="image/*" onchange="handleImageSelection(event)">
         </form>
 
-        <!-- Labels -->
-        <footer class="mt-12 flex gap-8 text-[10px] font-bold tracking-[0.3em] text-slate-700 uppercase">
-            <span>Fast</span>
-            <span>•</span>
-            <span>Secure</span>
-            <span>•</span>
-            <span>Powerful</span>
+        <!-- Minimal Footer Labels -->
+        <footer id="footer" class="mt-14 flex gap-10 text-[10px] font-bold tracking-[0.3em] text-slate-700 uppercase select-none">
+            <span class="hover:text-slate-500 transition-colors">Gemini 2.5</span>
+            <span class="opacity-30">•</span>
+            <span class="hover:text-slate-500 transition-colors">Secure</span>
+            <span class="opacity-30">•</span>
+            <span class="hover:text-slate-500 transition-colors">Instant</span>
         </footer>
 
     </main>
 
     <script>
-        // API Config
-        const apiKey = "AIzaSyDqPIgpsszkY187dE8k254OBIQMVtwJdpc";
-        const IMAGEN_MODEL = "imagen-4.0-generate-001";
-        const GEMINI_MODEL = "gemini-2.5-flash-preview-09-2025";
+        // API Configuration (Gemini Only)
+        const apiKey = ""; 
+        const IMAGEN_MODEL = "imagen-4.0-generate-001"; // Standard Generation
+        const GEMINI_MODEL = "gemini-2.5-flash-preview-09-2025"; // Vision & Reasoning
 
-        let refBase64 = null;
-        let isBusy = false;
+        let attachedImage = null;
+        let isProcessing = false;
 
+        // Init Lucide Icons
         lucide.createIcons();
 
+        // DOM References
         const form = document.getElementById('gen-form');
-        const input = document.getElementById('prompt-input');
-        const btn = document.getElementById('submit-btn');
-        const resultArea = document.getElementById('result-area');
-        const loader = document.getElementById('loading');
+        const input = document.getElementById('prompt-field');
+        const submitBtn = document.getElementById('submit-btn');
+        const resultView = document.getElementById('result-view');
+        const loader = document.getElementById('loading-overlay');
         const outputImg = document.getElementById('output-image');
-        const outputText = document.getElementById('output-text');
+        const outputTxt = document.getElementById('output-text');
         const hero = document.getElementById('hero');
+        const footer = document.getElementById('footer');
 
-        // Button color logic
+        // Dynamic Button Style on input
         input.addEventListener('input', () => {
-            const hasText = input.value.trim().length > 0;
-            btn.classList.toggle('bg-blue-600', hasText);
-            btn.classList.toggle('text-white', hasText);
-            btn.classList.toggle('bg-white/5', !hasText);
-            btn.classList.toggle('text-slate-700', !hasText);
-            btn.classList.toggle('cursor-not-allowed', !hasText);
+            const hasValue = input.value.trim().length > 0;
+            submitBtn.classList.toggle('bg-blue-600', hasValue);
+            submitBtn.classList.toggle('text-white', hasValue);
+            submitBtn.classList.toggle('bg-white/5', !hasValue);
+            submitBtn.classList.toggle('text-slate-700', !hasValue);
+            submitBtn.classList.toggle('cursor-not-allowed', !hasValue);
         });
 
-        function handleFile(event) {
+        function handleImageSelection(event) {
             const file = event.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    refBase64 = e.target.result;
-                    document.getElementById('ref-thumb').src = refBase64;
-                    document.getElementById('ref-preview').classList.remove('hidden');
-                };
-                reader.readAsDataURL(file);
-            }
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                attachedImage = e.target.result;
+                document.getElementById('ref-thumb').src = attachedImage;
+                document.getElementById('ref-preview').classList.remove('hidden');
+            };
+            reader.readAsDataURL(file);
         }
 
-        function clearRef() {
-            refBase64 = null;
+        function clearReference() {
+            attachedImage = null;
             document.getElementById('ref-preview').classList.add('hidden');
-            document.getElementById('file-input').value = "";
+            document.getElementById('file-picker').value = "";
         }
 
         function resetUI() {
-            resultArea.classList.add('hidden');
-            hero.classList.remove('hidden', 'opacity-0');
+            resultView.classList.add('hidden');
+            hero.classList.remove('hidden');
+            setTimeout(() => hero.classList.remove('opacity-0'), 50);
+            footer.classList.remove('opacity-0');
             input.value = "";
-            clearRef();
+            clearReference();
         }
 
-        async function generate(prompt, ref) {
-            let delay = 1000;
-            for (let i = 0; i < 5; i++) {
+        // Exponential Backoff API Wrapper
+        async function callGeminiAPI(prompt, base64Image) {
+            const isVisualRequest = prompt.toLowerCase().match(/(generate|image|create|draw|photo|pic|vision)/);
+            let retries = 5;
+            let backoff = 1000;
+
+            for (let i = 0; i < retries; i++) {
                 try {
-                    // Check if prompt is image-focused or text-focused
-                    const isImageQuery = prompt.toLowerCase().includes('generate') || prompt.toLowerCase().includes('image') || prompt.toLowerCase().includes('draw') || prompt.toLowerCase().includes('create');
-                    
                     let url, body;
 
-                    if (isImageQuery && !ref) {
+                    if (isVisualRequest && !base64Image) {
+                        // Text-to-Image (Imagen)
                         url = `https://generativelanguage.googleapis.com/v1beta/models/${IMAGEN_MODEL}:predict?key=${apiKey}`;
                         body = { instances: [{ prompt }], parameters: { sampleCount: 1 } };
                     } else {
+                        // Image Understanding / Reasoning (Gemini Flash)
                         url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
                         const parts = [{ text: prompt }];
-                        if (ref) parts.push({ inlineData: { mimeType: "image/png", data: ref.split(',')[1] } });
-                        body = { contents: [{ parts }], generationConfig: { responseModalities: isImageQuery ? ["IMAGE"] : ["TEXT"] } };
+                        if (base64Image) parts.push({ inlineData: { mimeType: "image/png", data: base64Image.split(',')[1] } });
+                        body = { 
+                            contents: [{ parts }],
+                            generationConfig: { responseModalities: isVisualRequest ? ["IMAGE"] : ["TEXT"] }
+                        };
                     }
 
                     const response = await fetch(url, { method: 'POST', body: JSON.stringify(body) });
-                    if (!response.ok) throw new Error();
+                    if (!response.ok) throw new Error("API_ERROR");
                     return await response.json();
                 } catch (e) {
-                    await new Promise(r => setTimeout(r, delay));
-                    delay *= 2;
+                    if (i === retries - 1) throw e;
+                    await new Promise(r => setTimeout(r, backoff));
+                    backoff *= 2;
                 }
             }
-            throw new Error("Failed");
         }
 
         form.onsubmit = async (e) => {
             e.preventDefault();
             const prompt = input.value.trim();
-            if (!prompt || isBusy) return;
+            if (!prompt || isProcessing) return;
 
-            isBusy = true;
+            isProcessing = true;
             input.disabled = true;
-            btn.disabled = true;
+            submitBtn.disabled = true;
 
+            // UI Hide Animations
             hero.classList.add('opacity-0');
-            setTimeout(() => hero.classList.add('hidden'), 500);
-            resultArea.classList.remove('hidden');
+            footer.classList.add('opacity-0');
+            
+            setTimeout(() => {
+                hero.classList.add('hidden');
+                resultView.classList.remove('hidden');
+            }, 400);
+
             loader.classList.remove('hidden');
             outputImg.classList.add('hidden');
-            outputText.classList.add('hidden');
-            document.getElementById('actions').classList.add('hidden');
+            outputTxt.classList.add('hidden');
+            document.getElementById('action-buttons').classList.add('hidden');
 
             try {
-                const data = await generate(prompt, refBase64);
+                const data = await callGeminiAPI(prompt, attachedImage);
                 
-                // Extract Image or Text
-                let imgSrc = null;
-                let txtResponse = null;
+                let finalImageData = null;
+                let finalTextData = null;
 
-                if (data.predictions) {
-                    imgSrc = `data:image/png;base64,${data.predictions[0].bytesBase64Encoded}`;
-                } else if (data.candidates) {
+                // Parsing Imagen 4.0 Result
+                if (data.predictions?.[0]?.bytesBase64Encoded) {
+                    finalImageData = `data:image/png;base64,${data.predictions[0].bytesBase64Encoded}`;
+                } 
+                // Parsing Gemini Flash Result
+                else if (data.candidates?.[0]?.content?.parts) {
                     const part = data.candidates[0].content.parts[0];
-                    if (part.inlineData) imgSrc = `data:image/png;base64,${part.inlineData.data}`;
-                    else txtResponse = part.text;
+                    if (part.inlineData) finalImageData = `data:image/png;base64,${part.inlineData.data}`;
+                    else finalTextData = part.text;
                 }
 
-                if (imgSrc) {
-                    outputImg.src = imgSrc;
-                    document.getElementById('download-link').href = imgSrc;
+                if (finalImageData) {
+                    outputImg.src = finalImageData;
+                    document.getElementById('download-trigger').href = finalImageData;
                     outputImg.classList.remove('hidden');
+                } else if (finalTextData) {
+                    outputTxt.innerText = finalTextData;
+                    outputTxt.classList.remove('hidden');
                 } else {
-                    outputText.innerText = txtResponse;
-                    outputText.classList.remove('hidden');
+                    throw new Error("EMPTY_RESPONSE");
                 }
-                
-                document.getElementById('actions').classList.remove('hidden');
+
+                document.getElementById('action-buttons').classList.remove('hidden');
             } catch (err) {
-                outputText.innerText = "Error: Service limit reached or API unavailable. Please try again.";
-                outputText.classList.remove('hidden');
+                console.error(err);
+                outputTxt.innerText = "Error: Gemini API limit hit ya network issue. Kripya thodi der baad phir koshish karein.";
+                outputTxt.classList.remove('hidden');
             } finally {
                 loader.classList.add('hidden');
-                isBusy = false;
+                isProcessing = false;
                 input.disabled = false;
-                btn.disabled = false;
+                submitBtn.disabled = false;
             }
         };
     </script>
