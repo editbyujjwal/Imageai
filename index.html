@@ -1,111 +1,53 @@
 <!DOCTYPE html>
-<html lang="hi">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Minimal AI Image Generator - Gemini Edition</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-        
-        :root {
-            --bg-navy: #0B1220;
-            --accent-blue: #2563eb;
-        }
-
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: var(--bg-navy);
-            color: white;
-            margin: 0;
-            display: flex;
-            flex-direction: column;
-            min-height: 100vh;
-            overflow-x: hidden;
-            -webkit-tap-highlight-color: transparent;
-        }
-
-        /* Perfect Rounded Container Fix (No artifacts sticking out) */
-        .input-group {
-            position: relative;
-            background: rgba(255, 255, 255, 0.04);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 24px; /* User Requested 22-24px Radius */
-            padding: 4px;
-            display: flex;
-            align-items: center;
-            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-            overflow: hidden; /* This kills the corner artifact/sar issue */
-            width: 100%;
-        }
-
-        .input-group:focus-within {
-            border-color: rgba(37, 99, 235, 0.5);
-            box-shadow: 0 0 30px rgba(37, 99, 235, 0.15);
-            background: rgba(255, 255, 255, 0.06);
-        }
-
-        .custom-input {
-            background: transparent;
-            border: none;
-            outline: none;
-            color: white;
-            padding: 14px 18px;
-            font-size: 17px;
-            width: 100%;
-        }
-
-        .custom-input::placeholder {
-            color: #64748b;
-        }
-
-        .loader {
-            border-top-color: transparent;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin { 100% { transform: rotate(360deg); } }
-
-        .fade-in-up {
-            animation: fadeInUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-        }
-
-        @keyframes fadeInUp {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .image-card {
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            backdrop-filter: blur(20px);
-            border-radius: 32px;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-        }
-    </style>
+  <title>Auto Caption Generator</title>
 </head>
-<body class="items-center justify-center p-6 sm:p-12">
+<body style="font-family:sans-serif;text-align:center;padding:40px;background:#F7F6F3">
 
-    <!-- Ambient Glow Background -->
-    <div class="fixed top-0 left-1/2 -translate-x-1/2 w-full h-full pointer-events-none opacity-20 select-none">
-        <div class="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-blue-600 blur-[140px] rounded-full"></div>
-    </div>
+<h1>🎬 Auto Caption Generator</h1>
 
-    <main class="w-full max-w-lg relative z-10 flex flex-col items-center">
-        
-        <!-- Headline Section -->
-        <header id="hero" class="text-center mb-14 space-y-4 transition-all duration-700">
-            <h1 class="text-4xl sm:text-5xl font-bold tracking-tight text-white leading-tight">
-                Create Without <br> Limits
-            </h1>
-            <p class="text-slate-400 text-lg font-medium opacity-80">
-                From idea to image — instantly.
-            </p>
-        </header>
+<input type="file" id="videoFile" accept="video/*"><br><br>
 
-        <!-- Result Display -->
-        <div id="result-view" class="hidden w-full mb-12 fade-in-up">
+<video id="preview" controls style="max-width:400px"></video><br>
+
+<button onclick="generate()">Generate Captions</button>
+
+<p id="status"></p>
+
+<pre id="output" style="background:black;color:#0f0;padding:15px;text-align:left"></pre>
+
+<script>
+const videoInput = document.getElementById("videoFile");
+const preview = document.getElementById("preview");
+
+videoInput.onchange = () => {
+  preview.src = URL.createObjectURL(videoInput.files[0]);
+};
+
+async function generate() {
+  const file = videoInput.files[0];
+  if (!file) return alert("Upload video");
+
+  const formData = new FormData();
+  formData.append("video", file);
+
+  document.getElementById("status").innerText = "Processing...";
+
+  const res = await fetch("http://localhost:3000/upload", {
+    method: "POST",
+    body: formData
+  });
+
+  const data = await res.json();
+
+  document.getElementById("output").innerText = data.srt;
+  document.getElementById("status").innerText = "Done!";
+}
+</script>
+
+</body>
+</html>        <div id="result-view" class="hidden w-full mb-12 fade-in-up">
             <div class="image-card relative aspect-square w-full overflow-hidden">
                 <!-- Loading State -->
                 <div id="loading-overlay" class="hidden absolute inset-0 bg-[#0B1220]/80 z-20 flex flex-col items-center justify-center space-y-4">
